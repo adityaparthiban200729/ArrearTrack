@@ -1,16 +1,18 @@
-# Optional presentation outline (confirm whether slides are required)
+# ArrearTrack presentation outline
 
-1. **Title** — ArrearTrack; team members; institution/course.
-2. **Problem** — arrears can affect placement eligibility; present this as the chosen local problem, not a claim about all colleges.
-3. **Aim and objectives** — record current results and compare against entered drive rules.
-4. **Users and scope** — student-project demonstrator / coordinator; advisory prototype; no official integration.
-5. **Requirements and workflow** — manage student → update result → configure drive → evaluate.
-6. **OOP concepts** — encapsulation; `Person` inheritance; repository/eligibility abstraction; polymorphic rule strategy.
-7. **DBMS design** — four tables, keys, constraints, relationship diagram.
-8. **Architecture / technology** — Swing, service layer, JDBC repositories, MySQL.
-9. **Screenshots / output** — Students, Results, Drives, Eligibility; fictional data.
-10. **Testing** — unit cases and actual database/CRUD test outcome.
-11. **Limitations and future work** — sample rules/data; attempt history and security are future work.
-12. **Conclusion / Q&A** — what was demonstrated and who did what.
+1. **Cover** — ArrearTrack; project subtitle; team members.
+2. **Problem and goal** — chosen student problem and the prototype's purpose.
+3. **Workflow** — maintain profiles/results/drives, evaluate rules, and export the report.
+4. **Architecture** — Swing → services → repository interfaces/JDBC → MySQL.
+5. **OOP in the implementation** — encapsulation, abstract `Person`, `Student` inheritance, interfaces, and polymorphism.
+6. **DBMS design** — four-table model, primary/foreign/unique/check constraints.
+7. **JDBC and CRUD** — prepared statements and create/read/update/delete paths.
+8. **Eligibility logic** — CGPA and arrear thresholds with explainable outcomes.
+9. **Application output** — real screenshots using fictional seed data.
+10. **Syllabus coverage** — all five units, including Java I/O, Streams, lambdas, and JDBC.
+11. **Verification and scope** — current unit-test results, documented prior UI/DB evidence, and limitations.
+12. **Conclusion and live demo** — key takeaways, team, and a short demo sequence.
 
-Keep any deck to the instructor's requested length and be ready to demo the app itself.
+**Team:** Aditya.p, Adithyaguhan.c, Aneesh.G, Adithya.s. Add institutional/course details only if the instructor asks for them.
+
+Use [`SYLLABUS_MAPPING.md`](SYLLABUS_MAPPING.md) as the detailed viva/study companion, and be ready to demonstrate the running app itself.

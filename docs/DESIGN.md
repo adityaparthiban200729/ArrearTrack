@@ -53,6 +53,7 @@ EligibilityRule (interface)
 EligibilityService ── uses ──> EligibilityRule
 MainFrame ── uses ──> StudentRepository / AcademicResultRepository / PlacementDriveRepository
 JdbcRepositories ── implements repository contracts using JDBC
+MainFrame ── uses ──> EligibilityAnalytics / EligibilityCsvExporter
 ```
 
 | Class / interface | Responsibility |
@@ -67,6 +68,8 @@ JdbcRepositories ── implements repository contracts using JDBC
 | `JdbcRepositories` | JDBC CRUD and SELECT statements with prepared parameters |
 | `EligibilityService` | Counts active arrears and evaluates each student using the supplied strategy |
 | `StandardEligibilityRule` | Applies the configured CGPA and arrear conditions |
+| `EligibilityAnalytics` | Uses reductions and parallel stream collectors to summarize overall and department-level outcomes |
+| `EligibilityCsvExporter` | Exports current eligibility results as UTF-8 CSV using byte/character streams and an `Iterator` |
 | `MainFrame` | Swing tabs, forms, tables, and user actions |
 
 ## Table dictionary

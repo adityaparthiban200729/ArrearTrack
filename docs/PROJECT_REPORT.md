@@ -5,7 +5,7 @@
 **Institution:** [College name]  
 **Department / programme:** [Department, course, year/semester]  
 **Submitted to:** [Faculty guide / course instructor]  
-**Submitted by:** [Team member names and register numbers — maximum 4]  
+**Submitted by:** Aditya.p, Adithyaguhan.c, Aneesh.G, Adithya.s (add register numbers if required)<br>
 **Academic year:** [Academic year]  
 **Project version:** 1.0 prototype
 
@@ -52,6 +52,7 @@ This topic was selected after the student confirmed that arrears can affect plac
 - **FR5:** Evaluate all saved students for a selected drive and show eligible/not eligible plus unmet reasons.
 - **FR6:** Validate required fields, semester (1–8), CGPA (0–10), non-negative arrear cap, and supported result status (`PASS` or `ARREAR`).
 - **FR7:** Persist data in MySQL through JDBC and preserve referential integrity.
+- **FR8:** Summarize overall and department-level eligibility outcomes and export the selected drive's current results as a UTF-8 CSV file.
 
 ### Non-functional requirements
 - **NFR1:** Use a layered UI / service / repository design.
@@ -59,13 +60,14 @@ This topic was selected after the student confirmed that arrears can affect plac
 - **NFR3:** Keep the app usable as a small desktop demonstration with readable messages and tables.
 - **NFR4:** Use synthetic examples by default; avoid storing unnecessary personal information.
 - **NFR5:** Make rules explicit and outcomes explainable.
+- **NFR6:** Encode CSV output as UTF-8, quote fields, and guard spreadsheet cells beginning with formula characters.
 
 ## 5. System design
 
 ### Modules
 1. **Presentation:** Java Swing tabs — Students, Results, Placement Drives, Eligibility.
 2. **Domain:** `Person`, `Student`, `Subject`, `AcademicResult`, `PlacementDrive`, `EligibilityResult`.
-3. **Service:** `EligibilityService` and `EligibilityRule` / `StandardEligibilityRule`.
+3. **Service:** `EligibilityService`, `EligibilityRule` / `StandardEligibilityRule`, `EligibilityAnalytics`, and `EligibilityCsvExporter`.
 4. **Persistence:** repository interfaces and JDBC implementations in `JdbcRepositories`.
 5. **Database:** MySQL tables defined in `database/schema.sql`.
 
@@ -96,7 +98,7 @@ The design uses four related tables. `students` and `subjects` are master data; 
 
 **Relationship summary:** one student has many current result rows; one subject has many current result rows; each current result belongs to exactly one student and one subject. Placement-drive rules are evaluated against students and are not stored as student-specific copies.
 
-Full executable DDL and fictional seed data are in `database/schema.sql`; the diagram and field notes are in `docs/DESIGN.md`.
+Full executable DDL and fictional seed data are in `database/schema.sql`; the diagram and field notes are in `docs/DESIGN.md`. The complete mapping to all five syllabus units is in `docs/SYLLABUS_MAPPING.md`.
 
 ## 7. Implementation and run instructions
 
@@ -104,22 +106,22 @@ Full executable DDL and fictional seed data are in `database/schema.sql`; the di
 **Connection settings:** `DB_URL`, `DB_USER`, `DB_PASSWORD`; defaults and setup are described in `README.md`.  
 **Run:** load `database/schema.sql`, then run `mvn test` and `mvn exec:java` from the project root.
 
-The Students screen performs profile CRUD. The Results screen selects a student and subject and saves one current status per pair. Saving the same pair updates the current status/attempt count through MySQL `ON DUPLICATE KEY UPDATE`. The Placement Drives screen maintains criteria. The Eligibility screen reads students/results, calls the service, and displays the result and reasons.
+The Students screen performs profile CRUD. The Results screen selects a student and subject and saves one current status per pair. Saving the same pair updates the current status/attempt count through MySQL `ON DUPLICATE KEY UPDATE`. The Placement Drives screen maintains criteria. The Eligibility screen reads students/results, calls the service, displays the result and reasons, and calculates overall and department summaries with Java Streams. **Export CSV** writes the current assessment as UTF-8 through byte and character streams. The exporter uses an `Iterator`, `Function`, and a nested functional `OutcomeFormatter` interface.
 
 ## 8. Testing and results
 
-The automated unit tests cover: a student meeting the criteria; simultaneous CGPA and arrear failures; missing CGPA behavior with and without a threshold; and arrear counting per student. Validation was completed against a local MySQL 8 database and a running Swing application on 11 October 2026:
+The current-code automated verification was run on 13 October 2026:
 
-- `mvn clean package`: **BUILD SUCCESS**; 4 tests passed, 0 failures, 0 errors, 0 skipped.
-- MySQL schema load: **successful**; 4 students, 4 subjects, 16 current-result rows, and 2 placement drives. All student entries are fictional.
-- Manual GUI CRUD: **verified against MySQL**; created and edited a temporary `TEST999` student, then deleted it. The original four demonstration records remain.
-- Eligibility update: **verified**; changing `DEMO002` / `CS402` from `ARREAR` to `PASS` changed the SampleTech result from **NOT ELIGIBLE** to **ELIGIBLE**. The result was restored to `ARREAR` after the test so the seed state is preserved.
+- `mvn clean test`: **BUILD SUCCESS**; 8 tests passed, 0 failures, 0 errors, 0 skipped.
+- Tests cover eligibility decisions, CGPA/arrear edge cases, student-specific arrear counting, parallel department summaries, reductions, UTF-8 CSV output, quote escaping, and custom nested-formatter behavior.
+
+The repository's earlier integration-test record, completed on 11 October 2026 before the CSV/analytics enhancement, documents a successful MySQL 8 schema load (4 fictional students, 4 subjects, 16 current-result rows, 2 drives), manual GUI CRUD, and the `DEMO002` / `CS402` eligibility change from **NOT ELIGIBLE** to **ELIGIBLE** after changing `ARREAR` to `PASS`. These earlier database/UI checks are reported as recorded evidence; they were not rerun as part of the 13 October code enhancement.
 
 The class demonstration should still show at least one CRUD path and the eligibility change after updating a result. The screenshots below show the original fictional seed state, not the temporary test record.
 
 ## 9. Limitations, privacy, and future work
 
-ArrearTrack is a classroom prototype and may not reproduce every company's or institution's rules. It has no user authentication, audit log, encrypted transport configuration, or official data link. The database stores one latest-known state per subject, not every historical attempt. Future work could add attempt history, access control, coordinator/student accounts, rule import from official drive notices, validation with consented student feedback, and a privacy review. Until approved, use fictional or anonymized records and do not make placement claims based on this app.
+ArrearTrack is a classroom prototype and may not reproduce every company's or institution's rules. It has no user authentication, audit log, encrypted transport configuration, CSV import, or official data link. The database stores one latest-known state per subject, not every historical attempt. Exported CSV files may contain student names and departments, so save and share them only with appropriate permission. Future work could add attempt history, access control, coordinator/student accounts, rule import from official drive notices, validation with consented student feedback, and a privacy review. Until approved, use fictional or anonymized records and do not make placement claims based on this app.
 
 ## 10. Screenshots to include in the final report
 

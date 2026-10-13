@@ -9,12 +9,15 @@ import in.college.arreartrack.repository.AcademicResultRepository;
 import in.college.arreartrack.repository.JdbcRepositories;
 import in.college.arreartrack.repository.PlacementDriveRepository;
 import in.college.arreartrack.repository.StudentRepository;
+import in.college.arreartrack.service.EligibilityAnalytics;
+import in.college.arreartrack.service.EligibilityCsvExporter;
 import in.college.arreartrack.service.EligibilityService;
 import in.college.arreartrack.service.StandardEligibilityRule;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -23,6 +26,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
@@ -32,6 +36,8 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridLayout;
+import java.io.File;
+import java.io.IOException;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.List;
@@ -41,6 +47,10 @@ public final class MainFrame extends JFrame {
     private final AcademicResultRepository resultRepo = JdbcRepositories.results();
     private final PlacementDriveRepository driveRepo = JdbcRepositories.drives();
     private final EligibilityService eligibilityService = new EligibilityService(new StandardEligibilityRule());
+    private final EligibilityAnalytics eligibilityAnalytics = new EligibilityAnalytics();
+    private final EligibilityCsvExporter eligibilityCsvExporter = new EligibilityCsvExporter();
+    private final JTextArea eligibilitySummary = new JTextArea(2, 40);
+    private final JButton exportEligibilityButton = new JButton("Export CSV");
 
     private final DefaultTableModel studentsModel = model("ID", "Roll No.", "Name", "Email", "Department", "Semester", "CGPA");
     private final DefaultTableModel resultsModel = model("ID", "Roll No.", "Student", "Subject", "Subject name", "Status", "Attempts", "Last updated");
@@ -116,12 +126,23 @@ public final class MainFrame extends JFrame {
         top.setBorder(BorderFactory.createEmptyBorder(4, 4, 10, 4));
         top.add(new JLabel("Evaluate students against:"), BorderLayout.WEST);
         top.add(driveSelector, BorderLayout.CENTER);
-        JButton refresh = new JButton("Evaluate / refresh"); refresh.addActionListener(e -> refreshEligibility()); top.add(refresh, BorderLayout.EAST);
+        JPanel actions = new JPanel();
+        JButton refresh = new JButton("Evaluate / refresh"); refresh.addActionListener(e -> refreshEligibility());
+        exportEligibilityButton.addActionListener(e -> exportEligibilityCsv());
+        actions.add(refresh); actions.add(exportEligibilityButton); top.add(actions, BorderLayout.EAST);
         JPanel info = new JPanel(new BorderLayout());
         info.add(top, BorderLayout.NORTH);
         JLabel note = new JLabel("Rules: minimum CGPA (if configured) and active arrears ≤ allowed maximum. This is an advisory prototype.");
         note.setBorder(BorderFactory.createEmptyBorder(0, 6, 9, 6)); info.add(note, BorderLayout.SOUTH);
-        panel.add(info, BorderLayout.NORTH);
+        eligibilitySummary.setEditable(false);
+        eligibilitySummary.setLineWrap(true);
+        eligibilitySummary.setWrapStyleWord(true);
+        eligibilitySummary.setOpaque(false);
+        eligibilitySummary.setBorder(BorderFactory.createEmptyBorder(0, 6, 8, 6));
+        JPanel heading = new JPanel(new BorderLayout());
+        heading.add(info, BorderLayout.NORTH);
+        heading.add(eligibilitySummary, BorderLayout.SOUTH);
+        panel.add(heading, BorderLayout.NORTH);
         panel.add(new JScrollPane(eligibilityTable), BorderLayout.CENTER);
         return panel;
     }
@@ -176,14 +197,56 @@ public final class MainFrame extends JFrame {
     private void refreshEligibility() {
         runSafely(() -> {
             eligibilityModel.setRowCount(0);
-            if (!(driveSelector.getSelectedItem() instanceof PlacementDrive drive)) return;
+            if (!(driveSelector.getSelectedItem() instanceof PlacementDrive drive)) {
+                eligibilitySummary.setText("Add or select a placement drive to evaluate students.");
+                return;
+            }
             studentCache = studentRepo.findAll(); resultCache = resultRepo.findAll();
             List<EligibilityResult> assessed = eligibilityService.assessAll(drive, studentCache, resultCache);
+            eligibilitySummary.setText(formatSummary(eligibilityAnalytics.summarize(assessed)));
             for (EligibilityResult outcome : assessed) {
                 Student s = outcome.student();
                 eligibilityModel.addRow(new Object[]{s.getRollNumber(), s.getFullName(), s.getCgpa() == null ? "—" : String.format("%.2f", s.getCgpa()), outcome.activeArrears(), outcome.eligible() ? "ELIGIBLE" : "NOT ELIGIBLE", outcome.reasonSummary()});
             }
         });
+    }
+
+    private String formatSummary(EligibilityAnalytics.Summary summary) {
+        String average = summary.averageCgpa() == null ? "—" : String.format("%.2f", summary.averageCgpa());
+        StringBuilder departments = new StringBuilder("By department: ");
+        summary.departments().forEach((name, values) -> {
+            if (departments.length() > "By department: ".length()) departments.append("  |  ");
+            departments.append(name).append(" — ").append(values.eligibleCount()).append('/')
+                    .append(values.studentCount()).append(" eligible");
+        });
+        return "Eligible: " + summary.eligibleCount() + "/" + summary.studentCount()
+                + "  •  Active arrears: " + summary.totalActiveArrears()
+                + "  •  Average CGPA: " + average + "\n" + departments;
+    }
+
+    private void exportEligibilityCsv() {
+        if (!(driveSelector.getSelectedItem() instanceof PlacementDrive drive)) {
+            info("Select a placement drive before exporting its eligibility results.");
+            return;
+        }
+        JFileChooser chooser = new JFileChooser();
+        String safeCompanyName = drive.companyName().replaceAll("[^A-Za-z0-9_-]+", "-");
+        chooser.setSelectedFile(new File("ArrearTrack-" + safeCompanyName + "-eligibility.csv"));
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        File destination = chooser.getSelectedFile();
+        if (destination.exists() && !confirm("Replace the existing file?\n" + destination.getAbsolutePath())) return;
+
+        exportEligibilityButton.setEnabled(false);
+        try {
+            List<EligibilityResult> assessed = eligibilityService.assessAll(
+                    drive, studentRepo.findAll(), resultRepo.findAll());
+            eligibilityCsvExporter.export(destination.toPath(), assessed);
+            info("Exported " + assessed.size() + " eligibility rows to:\n" + destination.getAbsolutePath());
+        } catch (SQLException | IOException ex) {
+            error("Could not export the eligibility report: " + ex.getMessage());
+        } finally {
+            exportEligibilityButton.setEnabled(true);
+        }
     }
 
     private void addStudent() { editStudentDialog(null); }
